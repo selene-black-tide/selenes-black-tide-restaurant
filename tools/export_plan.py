@@ -97,34 +97,48 @@ def convert() -> str:
     body = re.sub(r"([^\n])\n(#{1,3} )", r"\1\n\n\2", body)  # 标题前空行
     body = re.sub(r"(#{1,3} [^\n]+)\n([^\n#])", r"\1\n\n\2", body)  # 标题后空行
     body = body.strip()
+    return body, len(d.paragraphs)
 
-    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    head = f"""<!-- 本文件由 tools/export_plan.py 自动生成，请勿手改 -->
+
+HEADER = """<!-- 本文件由 tools/export_plan.py 自动生成，请勿手改 -->
 
 > **⚠️ 这是自动生成的镜像，不是源文件。**
 > 源文件：[游戏企划书.docx](游戏企划书.docx) —— 改内容请改 **docx**，然后跑 `python tools/export_plan.py` 重新导出。
-> 导出自：{stamp} · 源段落数 {len(d.paragraphs)}
+> 导出自：{stamp} · 源段落数 {n}
 
 # 游戏企划书 · Selene's Black Tide Restaurant
 
 > 项目正式定稿，**一切设计的最高依据**。这是给机器读的 Markdown 版本，结论以同目录的 docx 为准。
 
 ---
-
 """
-    return head + body + "\n"
+
+SEP = "\n---\n\n"
 
 
 def main() -> None:
     if not DOCX.exists():
         sys.exit(f"找不到源文件：{DOCX}")
 
-    text = convert()
-    MD.write_text(text, encoding="utf-8")
+    body, n = convert()
 
-    lines = text.count("\n")
+    # 内容没变就不重写，避免每次导出都刷时间戳、产生无意义 diff
+    if MD.exists():
+        old = MD.read_text(encoding="utf-8").replace("\r\n", "\n")
+        old_body = old.split(SEP, 1)[1] if SEP in old else ""
+        if old_body.strip() == body.strip():
+            print(f"OK  内容无变化，保持原文件：{MD.relative_to(ROOT)}")
+            return
+
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    text = HEADER.format(stamp=stamp, n=n) + "\n" + body + "\n"
+
+    # newline="\n" 强制 LF，跟 .gitattributes 的 eol=lf 对齐
+    with open(MD, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
     print(f"OK  已导出 {MD.relative_to(ROOT)}")
-    print(f"    {len(text)} 字符 / {lines} 行")
+    print(f"    {len(text)} 字符 / {text.count(chr(10))} 行")
 
 
 if __name__ == "__main__":
