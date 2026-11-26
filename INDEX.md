@@ -7,7 +7,8 @@
 
 | 文档 | 状态 | 它解决什么 |
 |---|---|---|
-| **[游戏企划书.docx](docs/00-overview/游戏企划书.docx)** | **★ 定稿** | **项目最高依据**，正式企划书，一切设计以它为准 |
+| **[游戏企划书.md](docs/00-overview/游戏企划书.md)** | **★ 定稿** | **项目最高依据**的机器可读版，AI 直接读这份 |
+| [游戏企划书.docx](docs/00-overview/游戏企划书.docx) | **★ 定稿** | 企划书**源文件**，由 `tools/export_plan.py` 导出上面的 md；**不要手改 md** |
 | [README.md](README.md) | 定稿 | 仓库地图、组员、30 秒导航 |
 | [AGENTS.md](AGENTS.md) | 定稿 | 所有 AI 的硬规则 + 术语表 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 定稿 | 提交流程、新增文档四步 |
@@ -17,7 +18,8 @@
 
 | 文档 | 状态 | 它解决什么 |
 |---|---|---|
-| [游戏企划书.docx](docs/00-overview/游戏企划书.docx) | 草稿 | 正式企划书（Word），对外/立项用 |
+| [游戏企划书.docx](docs/00-overview/游戏企划书.docx) | **★ 定稿** | 正式企划书（Word，源文件），一切设计的最高依据 |
+| [游戏企划书.md](docs/00-overview/游戏企划书.md) | 自动生成 | 上一份的机器可读镜像，给 AI 读；**不要手改**，跑 `python tools/export_plan.py` 重新导出 |
 
 ## 10-design · 系统设计
 
