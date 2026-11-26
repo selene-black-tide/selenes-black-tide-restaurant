@@ -31,7 +31,7 @@
 - 不用日期做前缀。日期写在 frontmatter 的 `updated` 里
 
 **R2 · 不新建顶层目录**
-顶层只有 `docs/`、`decisions/`、`assets/`、`src/`、`tools/`，外加**每人一个个人目录**（`Mizuki/`、`橙子/`…，用 GitHub 用户名命名）。要加别的顶层目录，先在 `decisions/` 里写一条 ADR。
+顶层只有 `docs/`、`decisions/`、`assets/`、`src/`、`tools/`，外加**每人一个个人目录**（`Mizuki-77/` 这种，用 GitHub **登录名**命名，不是显示名）。要加别的顶层目录，先在 `decisions/` 里写一条 ADR。
 
 **R3 · 术语只用一个英文 key**
 写代码、写 JSON schema、写接口时，必须用第 6 节术语表里的 key。**不要自己发明**——四家 AI 各翻各的，最后 `reputation` / `rating` / `fame` 会同时出现在三个文件里。
@@ -66,12 +66,12 @@ docs/30-tech/       技术方案、引擎选型、接口约定
 docs/90-archive/    废案、过期文档（不删，挪这来）
 decisions/          决策记录 ADR
 tools/              脚本（企划书导出等）
-Mizuki/             个人工作区（草稿，**不算项目结论**）
+Mizuki-77/          个人工作区（草稿，**不算项目结论**）
 assets/             美术与音频资源
 src/                代码
 ```
 
-> 个人目录（`Mizuki/` 这类）里的东西是**草稿**，不要当成已定设定去引用；里面的文件也不用登记 `INDEX.md`。
+> 个人目录（`Mizuki-77/` 这类）里的东西是**草稿**，不要当成已定设定去引用；里面的文件也不用登记 `INDEX.md`。
 > `assets/` 和 `src/` 还是空的——git 不跟踪空目录，等第一批内容提交时才出现。建了就直接往对应位置放，不用另外申请。
 
 ---
