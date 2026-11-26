@@ -76,7 +76,7 @@
 |---|---|---|
 | Mizuki | 制作 / 企划 / 经营系统 | DeepSeek |
 | 橙子 | 卡牌肉鸽 / 数值 | — |
-| _待填_ | _待填_ | _待填_ |
+| Alvin | 美术 / 交互与 UI / 基础代码 | Claude |
 
 > 新组员加进来，先读 [README](README.md) → [游戏理念.md](游戏理念.md) → [CONTRIBUTING.md](CONTRIBUTING.md)，半小时能接上。
 
