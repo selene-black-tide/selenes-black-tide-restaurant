@@ -1,0 +1,35 @@
+# 统一换行符为 LF。
+# 四家 AI 生成的文本多数是 LF，Windows 默认 CRLF，不锁的话同一份文件会反复显示「整篇被改」。
+* text=auto eol=lf
+
+# ---- 明确标记为二进制，git 不去猜、不做 diff ----
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.docx  binary
+*.xlsx  binary
+*.pptx  binary
+*.pdf   binary
+
+# ---- 大文件走 Git LFS ----
+# 首个 clone 后需 `git lfs install` 一次；GitHub Desktop 自带。
+*.psd     filter=lfs diff=lfs merge=lfs -text
+*.psb     filter=lfs diff=lfs merge=lfs -text
+*.aseprite filter=lfs diff=lfs merge=lfs -text
+*.ase     filter=lfs diff=lfs merge=lfs -text
+*.kra     filter=lfs diff=lfs merge=lfs -text
+*.blend   filter=lfs diff=lfs merge=lfs -text
+*.wav     filter=lfs diff=lfs merge=lfs -text
+*.mp3     filter=lfs diff=lfs merge=lfs -text
+*.ogg     filter=lfs diff=lfs merge=lfs -text
+*.flac    filter=lfs diff=lfs merge=lfs -text
+*.ttf     filter=lfs diff=lfs merge=lfs -text
+*.otf     filter=lfs diff=lfs merge=lfs -text
+*.woff2   filter=lfs diff=lfs merge=lfs -text
+
+# ---- Markdown 文档按语言统计，不影响渲染 ----
+*.md linguist-documentation
+docs/** linguist-documentation

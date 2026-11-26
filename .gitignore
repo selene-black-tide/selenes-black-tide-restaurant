@@ -1,0 +1,48 @@
+# ---- 本仓库专属 ----
+# 临时脚本、中间产物、抓取下来的 html
+_tmp/
+*.bak-*
+
+# 本机私有内容：数据源路径、群号、脚本位置等，永不入库
+_local/
+
+# ---- Office 临时文件（Word 打开文档时会生成，绝对不能提交）----
+~$*
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# ---- 系统垃圾 ----
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---- 引擎：Unity ----
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.csproj
+*.sln
+*.user
+
+# ---- 引擎：Godot ----
+.godot/
+*.translation
+export_presets.cfg
+
+# ---- 代码与虚拟环境 ----
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+
+# ---- 密钥（永远不要提交）----
+.env
+.env.*
+*.pem
+*.key
