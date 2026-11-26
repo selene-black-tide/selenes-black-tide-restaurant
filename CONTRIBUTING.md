@@ -70,6 +70,7 @@ git config --global core.quotepath false
 ## 6. 不做的事
 
 - ❌ 不删别人的文档——要废就改 `status: 废案` 并挪进 `docs/90-archive/`
+- ❌ **不动别人的个人目录、不删别人的分支**；公共文档只增不删别人的结论（详见 [AGENTS.md](AGENTS.md) R9）
 - ❌ 不提交 `_tmp/`、`~$*.docx`、`*.bak-*`（已进 `.gitignore`）
 - ❌ 不为了「看起来完整」而建空文件、写 `TODO`
 - ❌ 不在仓库里放密钥、`.env`、个人路径
