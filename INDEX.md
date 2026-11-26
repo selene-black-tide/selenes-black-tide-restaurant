@@ -39,6 +39,7 @@
 | [AI美术选型.md](docs/20-art/AI美术选型.md) | 定稿 | 按用途配工具：图标 / 立绘 / 量产，含价格与商用红线 |
 | [NAI入门.md](docs/20-art/NAI入门.md) | 定稿 | NovelAI 出二次元立绘：tag 语法、一致性、QC 清单 |
 | [像素等距工作流.md](docs/20-art/像素等距工作流.md) | 定稿 | 等距像素资产：投影、光照、色板、四步工作流 |
+| [PixelLab入门.md](docs/20-art/PixelLab入门.md) | 草稿 | PixelLab 只做图标和等距砖：四个工具面、七天路线、B 站教程 |
 
 ## 30-tech · 技术
 
