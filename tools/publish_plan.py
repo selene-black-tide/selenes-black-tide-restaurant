@@ -17,7 +17,9 @@ GitHub 不渲染 .docx，别人点开只能下载。
 from __future__ import annotations
 
 import datetime
+import glob
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +27,34 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DOCX = "docs/00-overview/游戏企划书.docx"
 MD = "docs/00-overview/游戏企划书.md"
+
+
+def find_git() -> str:
+    """找 git 的绝对路径。
+
+    为什么不直接写 "git"：双击运行时继承的是 Explorer 的环境变量，
+    有时候还没刷新到最新 PATH（Git 装完要重开终端才生效），
+    那时候 subprocess 找不到 git，会直接抛 FileNotFoundError。
+    """
+    p = shutil.which("git")
+    if p:
+        return p
+    candidates = [
+        r"C:\Program Files\Git\cmd\git.exe",
+        r"C:\Program Files\Git\bin\git.exe",
+        r"C:\Program Files (x86)\Git\cmd\git.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\cmd\git.exe"),
+    ]
+    candidates += glob.glob(
+        os.path.expandvars(r"%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe")
+    )
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return ""
+
+
+GIT = find_git()
 
 # Windows 控制台默认 GBK，子进程默认也按 GBK 输出，两边一混就乱码/报错。
 # 统一让子进程用 UTF-8，自己这边打印时做一次兜底。
@@ -51,12 +81,19 @@ def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
 
 
 def git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return run(["git", *args], check=check)
+    return run([GIT, *args], check=check)
 
 
 def main() -> None:
     if not (ROOT / ".git").exists():
         sys.exit(f"这里不是 git 仓库：{ROOT}")
+
+    if not GIT:
+        sys.exit(
+            "找不到 git。\n"
+            "装一个：winget install --id Git.Git -e --source winget\n"
+            "装完重开一个终端窗口再试。"
+        )
 
     # 1. 导出 md
     say("[1/4] 导出 游戏企划书.md ...")
