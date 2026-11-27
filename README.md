@@ -138,10 +138,10 @@ python tools/publish_plan.py
 | 谁 | GitHub | 分管 | 常用 AI |
 |---|---|---|---|
 | Mizuki | [`Mizuki-77`](https://github.com/Mizuki-77) | 制作 / 企划 / 经营系统 / 美术 | DeepSeek |
-| 橙子 | [`azike67`](https://github.com/azike67) | 卡牌肉鸽 / 数值 | DeepSeek |
+| 橙子 | [`Shadorange`](https://github.com/Shadorange) | 卡牌肉鸽 / 数值 | DeepSeek |
 | Alvin | [`alvinczq7-cell`](https://github.com/alvinczq7-cell) | 美术 / 交互与 UI / 基础代码 | Claude |
 | Ng.j.d | [`WJD10086`](https://github.com/WJD10086) | 基础代码开发 / Debug / 交互设计 | DeepSeek |
-| Shadorange | [`Shadorange`](https://github.com/Shadorange) | 角色设计（见其个人区，待本人补） | — |
+| azike67 | [`azike67`](https://github.com/azike67) | _待本人填_ | _待本人填_ |
 
 > 新组员加进来，先读 [README](README.md) → [游戏企划书.md](docs/00-overview/游戏企划书.md) → [游戏理念.md](游戏理念.md) → [CONTRIBUTING.md](CONTRIBUTING.md)，半小时能接上。
 > 加入方式：组长在组织里发邀请 → 接受后成为成员，然后照上面「四条命令」拉仓库。
