@@ -44,12 +44,30 @@ TOP_WORDS = [
 # 二级章节：怪物条目之类
 SUB_RE = re.compile(r"^(敌怪\s*\d+|精英\s*\d+.*|boss|以下为.+|三小只|四小只|【地图.*)\s*$", re.I)
 
+# 整段精确匹配的一级标题（经营供给那套「一、二、三…」的写法）
+EXACT_H2 = {
+    "11/28完善",
+    "一、厨房", "二、计划单", "三、特殊顾客需求", "四、风评结算【修订】", "五、客人数目",
+    "待定",
+}
+
+# 圈号小标题（① 满足率）与固定小节名
+CIRCLED_RE = re.compile(r"^[①②③④⑤⑥⑦⑧⑨⑩]")
+SUB_EXACT = {"验算", "自平衡", "计算规则", "口径", "增加方法"}
+
 # 「标签：内容」的短标签
 LABEL_RE = re.compile(r"^([^：:]{1,10})[：:]\s*(.*)$")
 
 
 def classify(text: str):
     """返回 (kind, 主标题, 剩余正文)。kind: h2 / h3 / quote / label / p"""
+    if text in EXACT_H2:
+        return "h2", text, ""
+    if CIRCLED_RE.match(text):
+        return "h3", text, ""
+    if text.rstrip("：: ") in SUB_EXACT:
+        return "h3", text.rstrip("：: "), ""
+
     for w in TOP_WORDS:
         if text.startswith(w):
             rest = text[len(w):].lstrip("：: ").strip()
@@ -69,12 +87,33 @@ def classify(text: str):
     return "p", text, ""
 
 
-def convert() -> str:
+def convert() -> tuple[str, int]:
     d = docx.Document(str(DOCX))
+    paras = list(d.paragraphs)
 
     lines: list[str] = []
-    for para in d.paragraphs:
+    i = 0
+    while i < len(paras):
+        para = paras[i]
         t = para.text.strip()
+
+        # 制表符分隔的连续段落 -> Markdown 表格
+        if "\t" in para.text:
+            rows: list[list[str]] = []
+            while i < len(paras) and "\t" in paras[i].text:
+                rows.append([c.strip() for c in paras[i].text.strip().split("\t")])
+                i += 1
+            width = max(len(r) for r in rows)
+            rows = [r + [""] * (width - len(r)) for r in rows]
+            lines.append("")
+            lines.append("| " + " | ".join(rows[0]) + " |")
+            lines.append("|" + "---|" * width)
+            for r in rows[1:]:
+                lines.append("| " + " | ".join(r) + " |")
+            lines.append("")
+            continue
+
+        i += 1
         if not t:
             lines.append("")
             continue
