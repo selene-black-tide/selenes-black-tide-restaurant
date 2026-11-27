@@ -74,7 +74,7 @@
 
 | 谁 | 分管 | 常用 AI |
 |---|---|---|
-| Mizuki | 制作 / 企划 / 经营系统 | DeepSeek |
+| Mizuki | 制作 / 企划 / 经营系统 / 美术 | DeepSeek |
 | 橙子 | 卡牌肉鸽 / 数值 | — |
 | Alvin | 美术 / 交互与 UI / 基础代码 | Claude |
 | Ng.j.d | 基础代码开发 / Debug / 交互设计 | DeepSeek |
