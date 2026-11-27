@@ -16,6 +16,7 @@ _local/
 Thumbs.db
 desktop.ini
 .DS_Store
+*.lnk
 
 # ---- 引擎：Unity ----
 [Ll]ibrary/
