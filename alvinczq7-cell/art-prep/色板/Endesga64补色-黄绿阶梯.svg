@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 440" font-family="sans-serif" font-size="14"><rect width="1000" height="440" fill="#242428"/>
+<text x="20" y="32" font-size="20" fill="#eee">Endesga 64 + 补色提案：黄绿明度阶梯与深肤色（橙框 = 新增）</text>
+<rect x="30" y="60" width="140" height="120" fill="#314e18" stroke="#ff9620" stroke-width="5"/>
+<text x="30" y="204" fill="#ddd">#314e18</text><text x="30" y="224" fill="#ffaa3c" font-size="12">L=0.20 新增</text>
+<rect x="190" y="60" width="140" height="120" fill="#4d7722" stroke="#ff9620" stroke-width="5"/>
+<text x="190" y="204" fill="#ddd">#4d7722</text><text x="190" y="224" fill="#ffaa3c" font-size="12">L=0.30 新增</text>
+<rect x="350" y="60" width="140" height="120" fill="#6da52c" stroke="#ff9620" stroke-width="5"/>
+<text x="350" y="204" fill="#ddd">#6da52c</text><text x="350" y="224" fill="#ffaa3c" font-size="12">L=0.41 新增</text>
+<rect x="510" y="60" width="140" height="120" fill="#8fd039" stroke="#ff9620" stroke-width="5"/>
+<text x="510" y="204" fill="#ddd">#8fd039</text><text x="510" y="224" fill="#ffaa3c" font-size="12">L=0.52 新增</text>
+<rect x="670" y="60" width="140" height="120" fill="#99e65f"/>
+<text x="670" y="204" fill="#ddd">#99e65f</text><text x="670" y="224" fill="#aaa" font-size="12">L=0.64 原板</text>
+<rect x="830" y="60" width="140" height="120" fill="#d3fc7e"/>
+<text x="830" y="204" fill="#ddd">#d3fc7e</text><text x="830" y="224" fill="#aaa" font-size="12">L=0.74 原板</text>
+<text x="30" y="270" fill="#ffdc78">肤色：新增 1 个深肤色（橙框）补在 8a4836 和 5d2c28 之间</text>
+<rect x="30" y="290" width="100" height="80" fill="#391f21"/>
+<text x="30" y="392" fill="#bbb" font-size="12">391f21</text>
+<rect x="150" y="290" width="100" height="80" fill="#5d2c28"/>
+<text x="150" y="392" fill="#bbb" font-size="12">5d2c28</text>
+<rect x="270" y="290" width="100" height="80" fill="#6f462f" stroke="#ff9620" stroke-width="5"/>
+<text x="270" y="392" fill="#ffaa3c" font-size="12">6f462f 新增</text>
+<rect x="390" y="290" width="100" height="80" fill="#8a4836"/>
+<text x="390" y="392" fill="#bbb" font-size="12">8a4836</text>
+<rect x="510" y="290" width="100" height="80" fill="#bf6f4a"/>
+<text x="510" y="392" fill="#bbb" font-size="12">bf6f4a</text>
+<rect x="630" y="290" width="100" height="80" fill="#e69c69"/>
+<text x="630" y="392" fill="#bbb" font-size="12">e69c69</text>
+<rect x="750" y="290" width="100" height="80" fill="#f6ca9f"/>
+<text x="750" y="392" fill="#bbb" font-size="12">f6ca9f</text>
+<rect x="870" y="290" width="100" height="80" fill="#f9e6cf"/>
+<text x="870" y="392" fill="#bbb" font-size="12">f9e6cf</text>
+</svg>
