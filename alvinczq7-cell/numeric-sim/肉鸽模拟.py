@@ -382,6 +382,34 @@ def main():
     scale_enemies(1.0, 1.0)
     md(rows, ["整局体力", "通关率(怪生命×2)", "平均推进", "剩余体力"])
 
+    print("## J. 怪物生命倍率 × 整局体力 网格（伤害 ×1，补全版，机器人『稳』）：格子 = 通关率 / 平均剩余体力\n")
+    mults = (1.5, 1.75, 2.0, 2.5, 3.0)
+    stams = (80, 100, 120)
+    rows = []
+    for hm in mults:
+        scale_enemies(hm, 1.0)
+        row = [f"×{hm}"]
+        for stam in stams:
+            res = batch(runs, "稳", stamina=stam)
+            w, cl, st = summarize(res)
+            row.append(f"{w:.0%} / {st:.0f}")
+        rows.append(row)
+    scale_enemies(1.0, 1.0)
+    md(rows, ["怪物生命"] + [f"体力 {x}" for x in stams])
+
+    print("## J2. 同一网格，『随机出牌』机器人（当作新手下限）\n")
+    rows = []
+    for hm in mults:
+        scale_enemies(hm, 1.0)
+        row = [f"×{hm}"]
+        for stam in stams:
+            res = batch(runs, "随机", stamina=stam)
+            w, cl, st = summarize(res)
+            row.append(f"{w:.0%} / {cl:.1f}层")
+        rows.append(row)
+    scale_enemies(1.0, 1.0)
+    md(rows, ["怪物生命"] + [f"体力 {x}" for x in stams])
+
     print("## I. 单卡测试：起手 + 2 张某卡，逐遭遇打，不回血，每场新开 50 血\n")
     rows = single_card_table(max(30, runs // 8))
     md(rows, ["加的卡", "平均掉血", "平均出牌", "相对起手：掉血", "相对起手：出牌"])
