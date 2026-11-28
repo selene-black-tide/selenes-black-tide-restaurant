@@ -90,16 +90,91 @@ CARDS = {
     "省力": {"kind": "能力", "text": "每第 4 张牌免费", "ops": [("power", "省力")]},
     "拉伸": {"kind": "能力", "text": "每造成 5 伤得 1 格挡", "ops": [("power", "拉伸")]},
     "刺伤": {"kind": "能力", "text": "每次伤害施加 1 层流血", "ops": [("power", "刺伤")]},
+
+    # ================= 角色 2 · 检索展开 =================
+    # —— 初始 ——
+    "歌咏": {"kind": "技能", "owner": 2, "text": "弃牌堆的一张回手",
+             "ops": [("pick_discard", 1)]},
+
+    # —— 球 ——
+    "火球": {"kind": "攻击", "owner": 2, "text": "打 10，灼烧 1", "ball": True, "atk": 10,
+             "ops": [("dmg", 10), ("burn", 1)]},
+    "冰球": {"kind": "攻击", "owner": 2, "text": "打 4 防 4", "ball": True, "atk": 4,
+             "ops": [("dmg", 4), ("block", 4)]},
+    "风球": {"kind": "攻击", "owner": 2, "text": "打 6，虚弱 1", "ball": True, "atk": 6,
+             "ops": [("dmg", 6), ("weak_enemy", 1)]},
+    "土球": {"kind": "攻击", "owner": 2, "text": "打 10，弃牌堆加一张复制", "ball": True, "atk": 10,
+             "ops": [("dmg", 10), ("copy_self",)]},
+
+    # —— 合成（消耗）——
+    "蓝火球": {"kind": "攻击", "owner": 2, "text": "打 15 防 10（消耗）", "exhaust": True,
+               "ops": [("dmg", 15), ("block", 10)]},
+    "火龙卷": {"kind": "攻击", "owner": 2, "text": "打 20 灼烧 5（消耗）", "exhaust": True,
+               "ops": [("dmg", 20), ("burn", 5)]},
+    "冰暴": {"kind": "攻击", "owner": 2, "text": "打 12 冻结（消耗）", "exhaust": True,
+             "ops": [("dmg", 12), ("freeze",)]},
+
+    # —— 其他攻击 ——
+    "杖击": {"kind": "攻击", "owner": 2, "text": "打 8，从抽牌堆选 1 张",
+             "ops": [("dmg", 8), ("pick_draw", 1)]},
+    "元素打击": {"kind": "攻击", "owner": 2, "text": "手中 3 张球：打 6 + 三球攻击力",
+                 "ops": [("elem_strike",)]},
+
+    # —— 技能 ——
+    "聚气": {"kind": "技能", "owner": 2, "text": "丢 2 张，从抽牌堆选 2 张",
+             "ops": [("discard_choose", 2), ("pick_draw", 2)]},
+    "散气": {"kind": "技能", "owner": 2, "text": "消耗手牌 2 张",
+             "ops": [("exhaust_choose", 2)]},
+    "置换": {"kind": "技能", "owner": 2, "text": "丢 1 张，抽 4", "ops": [("discard_choose", 1), ("draw", 4)]},
+    "分解": {"kind": "技能", "owner": 2, "text": "蓝火球/火龙卷/冰暴 拆成两张球",
+             "ops": [("decompose",)]},
+    "变形": {"kind": "技能", "owner": 2, "text": "把一张球变成指定的另一种球",
+             "ops": [("transform",)]},
+    "元素风暴": {"kind": "技能", "owner": 2, "text": "抽牌堆与弃牌堆的球全部入手",
+                 "ops": [("storm",)]},
+
+    # —— 能力 ——
+    "魔典": {"kind": "能力", "owner": 2, "text": "回合开始随机一张球入手",
+             "ops": [("power", "魔典")]},
+    "注能": {"kind": "能力", "owner": 2, "text": "蓝火球/火龙卷/冰暴不再消耗",
+             "ops": [("power", "注能")]},
+    "烈焰": {"kind": "能力", "owner": 2, "text": "灼烧每层每回合扣 4 血",
+             "ops": [("power", "烈焰")]},
+    "灵魂之力": {"kind": "能力", "owner": 2, "text": "每回合扣 1 血，全体 9 伤",
+                 "ops": [("power", "灵魂之力")]},
+    "引导": {"kind": "能力", "owner": 2, "text": "回合开始从抽牌堆选 1 张",
+             "ops": [("power", "引导")]},
 }
 
-STARTER_DECK = ["打击"] * 4 + ["防御"] * 4 + ["重击"]
+# 角色表。draw 是每回合抽几张（角色能力已算进去），deck 是初始卡组。
+CHARS = {
+    1: {"name": "无脑灌伤", "hp": 50, "draw": 6,
+        "deck": ["打击"] * 4 + ["防御"] * 4 + ["重击"],
+        "ability": "每回合多抽一张牌"},
+    2: {"name": "检索展开", "hp": 40, "draw": 5,
+        "deck": ["打击"] * 3 + ["防御"] * 3 + ["歌咏"],
+        "ability": "回合结束可以保留一张手牌"},
+}
+
+# 四种球，以及两两组合生成的牌（同一回合内凑齐就入手，每回合各一次）
+BALLS = ("火球", "冰球", "风球", "土球")
+COMBOS = [
+    ({"火球", "冰球"}, "蓝火球"),
+    ({"火球", "风球"}, "火龙卷"),
+    ({"冰球", "风球"}, "冰暴"),
+]
+# 分解表：合成牌 -> 组成它的两张球
+DECOMPOSE = {"蓝火球": ("冰球", "火球"), "火龙卷": ("火球", "风球"), "冰暴": ("冰球", "风球")}
+
+STARTER_DECK = CHARS[1]["deck"]
 REWARD_POOL = [c for c in CARDS if c not in ("打击", "防御", "重击")]
 
 # ---------------------------------------------------------------- 敌怪
 
 def E(name, hp, intents, kind=None):
     return {"name": name, "hp": hp, "max_hp": hp, "block": 0, "strength": 0,
-            "rage": 0, "bleed": 0, "i": 0, "intents": intents, "kind": kind}
+            "rage": 0, "bleed": 0, "burn": 0, "weak": 0, "frozen": False,
+            "i": 0, "intents": intents, "kind": kind}
 
 
 # 意图格式：("atk", 伤害, 次数) / ("str", n) / ("blk", n) / ("debuff", 名称)
@@ -241,12 +316,47 @@ def intent_text(it):
 
 # ---------------------------------------------------------------- 玩家
 
+# 选择型卡牌（从牌堆挑牌、挑弃牌…）的交互钩子。
+# _CTX["policy"] 非空时（模拟 / 回归测试）不弹提示，直接取前几个。
+_CTX = {"policy": None}
+
+
+def choose_cards(prompt, items, n, allow_skip=False):
+    """从 items 里挑 n 个，返回下标列表。"""
+    if not items or n <= 0:
+        return []
+    n = min(n, len(items))
+    if _CTX["policy"] is not None:
+        return list(range(n))
+    print(f"\n  {prompt}")
+    for i, c in enumerate(items, 1):
+        print(f"    {i}. {c}")
+    while True:
+        raw = input("  选序号（空格分隔，q 跳过）> ").strip()
+        if raw in ("q", "Q") and allow_skip:
+            return []
+        parts = raw.replace("，", " ").replace(",", " ").split()
+        try:
+            idx = [int(p) - 1 for p in parts]
+        except ValueError:
+            print("    ✗ 要输序号")
+            continue
+        if len(idx) == n and len(set(idx)) == n and all(0 <= i < len(items) for i in idx):
+            return idx
+        print(f"    ✗ 要选 {n} 个不重复的序号")
+
+
 class Player:
-    def __init__(self, deck):
-        self.max_hp = START_HP
-        self.hp = START_HP
+    def __init__(self, char=1, deck=None):
+        if isinstance(char, list):        # 兼容 Player(卡组列表) 的旧写法
+            deck, char = char, 1
+        info = CHARS[char]
+        self.char = char
+        self.max_hp = info["hp"]
+        self.hp = info["hp"]
+        self.draw_per_turn = info["draw"]
         self.stamina = RUN_STAMINA
-        self.deck = list(deck)
+        self.deck = list(deck if deck is not None else info["deck"])
         self.block = 0
         self.strength = 0
         self.dexterity = 0
@@ -263,6 +373,8 @@ class Player:
         self.cards_played = 0
         self.dmg_counter = 0
         self.entangle = 0
+        self.balls_played = set()      # 本回合打出过的球（凑组合用）
+        self.combo_done = set()        # 本回合已经生成过的组合牌
         self.draw_pile, self.hand, self.discard, self.exhaust = [], [], [], []
 
     # —— 牌堆 ——
@@ -290,7 +402,7 @@ class Player:
             got += 1
         return got
 
-    def start_turn(self):
+    def start_turn(self, enemies=None):
         self.weak = self._weak_next
         self.slow = self._slow_next
         self.vuln = self._vuln_next
@@ -298,14 +410,43 @@ class Player:
         self._weak_next = self._slow_next = self._vuln_next = self._flat_next = 0
         self.block = 0
         self.thorns = False   # 招架只保本回合，敌方行动期间有效
+        self.balls_played = set()
+        self.combo_done = set()
         if self.entangle > 0 and self.hp > 0:
             self.hp -= self.entangle
             print(f"  ⚠ 缠绕发作，受到 {self.entangle} 点伤害")
-        self.draw(DRAW_PER_TURN)
+        self.draw(self.draw_per_turn)
+
+        # 角色 2 的回合开始能力
+        if "魔典" in self.powers and len(self.hand) < MAX_HAND:
+            got = random.choice(BALLS)
+            self.hand.append(got)
+            print(f"  ✦ 魔典：{got} 入手")
+        if "引导" in self.powers and self.draw_pile and len(self.hand) < MAX_HAND:
+            idx = choose_cards("引导：从抽牌堆选一张入手", self.draw_pile, 1)
+            if idx:
+                self.hand.append(self.draw_pile.pop(idx[0]))
+                print("  ✦ 引导：拿了一张")
+        if "灵魂之力" in self.powers:
+            self.hp -= 1
+            print("  ✦ 灵魂之力：自损 1 血")
+            for e in (enemies or []):
+                if e["hp"] > 0:
+                    absorbed = min(e["block"], 9)
+                    e["block"] -= absorbed
+                    e["hp"] -= 9 - absorbed
+            if enemies:
+                print("  ✦ 灵魂之力：全体 9 伤")
 
     def end_turn(self):
+        keep = None
+        if self.char == 2 and self.hand:
+            idx = choose_cards("回合结束：选一张手牌留下（其余弃掉）", self.hand, 1,
+                               allow_skip=True)
+            if idx:
+                keep = self.hand.pop(idx[0])
         self.discard.extend(self.hand)
-        self.hand = []
+        self.hand = [keep] if keep is not None else []
 
     # —— 数值 ——
     def gain_block(self, n):
@@ -428,10 +569,122 @@ def play_card(player, name, enemies, log):
                 player.powers.add(op[1])
                 log.append(f"获得能力：{op[1]}")
 
+            # —— 角色 2 ——
+            elif k == "burn":
+                target = next((e for e in enemies if e["hp"] > 0), None)
+                if target:
+                    target["burn"] += op[1]
+                    log.append(f"{target['name']} 灼烧 +{op[1]}（共 {target['burn']} 层）")
+            elif k == "weak_enemy":
+                target = next((e for e in enemies if e["hp"] > 0), None)
+                if target:
+                    target["weak"] += op[1]
+                    log.append(f"{target['name']} 虚弱 +{op[1]}")
+            elif k == "freeze":
+                target = next((e for e in enemies if e["hp"] > 0), None)
+                if target:
+                    target["frozen"] = True
+                    log.append(f"{target['name']} 被冻结，本回合无法行动")
+            elif k == "copy_self":
+                player.discard.append(name)
+                log.append("一张复制品进入弃牌堆")
+            elif k == "pick_discard":
+                if player.discard:
+                    idx = choose_cards("从弃牌堆选牌入手", player.discard, op[1])
+                    for i in sorted(idx, reverse=True):
+                        player.hand.append(player.discard.pop(i))
+                    log.append(f"从弃牌堆拿回 {len(idx)} 张")
+                else:
+                    log.append("弃牌堆是空的")
+            elif k == "pick_draw":
+                if player.draw_pile:
+                    idx = choose_cards("从抽牌堆选牌入手", player.draw_pile, op[1])
+                    for i in sorted(idx, reverse=True):
+                        player.hand.append(player.draw_pile.pop(i))
+                    log.append(f"从抽牌堆拿了 {len(idx)} 张")
+                else:
+                    log.append("抽牌堆是空的")
+            elif k == "discard_choose":
+                if player.hand:
+                    idx = choose_cards("丢掉手牌（进弃牌堆）", player.hand, op[1])
+                    for i in sorted(idx, reverse=True):
+                        player.discard.append(player.hand.pop(i))
+                    log.append(f"丢掉 {len(idx)} 张")
+                else:
+                    log.append("手里没牌可丢")
+            elif k == "exhaust_choose":
+                if player.hand:
+                    idx = choose_cards("消耗手牌（进消耗堆）", player.hand, op[1])
+                    for i in sorted(idx, reverse=True):
+                        player.exhaust.append(player.hand.pop(i))
+                    log.append(f"消耗 {len(idx)} 张")
+                else:
+                    log.append("手里没牌可消耗")
+            elif k == "decompose":
+                opts = [c for c in player.hand if c in DECOMPOSE]
+                if opts:
+                    idx = choose_cards("分解哪张合成牌", opts, 1)
+                    old = opts[idx[0]]
+                    player.hand.remove(old)
+                    player.discard.append(old)
+                    player.hand.extend(DECOMPOSE[old])
+                    log.append(f"分解 {old} → {DECOMPOSE[old][0]} + {DECOMPOSE[old][1]}")
+                else:
+                    log.append("手里没有能分解的牌")
+            elif k == "transform":
+                opts = [c for c in player.hand if c in BALLS]
+                if opts:
+                    idx = choose_cards("变形哪张球", opts, 1)
+                    old = opts[idx[0]]
+                    ti = choose_cards("变成哪种球", list(BALLS), 1)
+                    new = BALLS[ti[0]]
+                    player.hand[player.hand.index(old)] = new
+                    log.append(f"变形：{old} → {new}")
+                else:
+                    log.append("手里没有球")
+            elif k == "storm":
+                moved = 0
+                for pile in (player.draw_pile, player.discard):
+                    for i in reversed(range(len(pile))):
+                        if pile[i] in BALLS:
+                            player.hand.append(pile.pop(i))
+                            moved += 1
+                log.append(f"元素风暴：{moved} 张球入手")
+            elif k == "elem_strike":
+                balls = [c for c in player.hand if c in BALLS]
+                balls.sort(key=lambda c: CARDS[c].get("atk", 0), reverse=True)
+                pick = balls[:3]
+                base = 6 + sum(CARDS[c].get("atk", 0) for c in pick)
+                target = next((e for e in enemies if e["hp"] > 0), None)
+                if target:
+                    d = attack_enemy(player, target, base, log)
+                    log.append(f"元素打击（{' + '.join(pick)}）{base} → 造成 {d} 点伤害")
+
+    # 球类卡牌打出后，检查两两组合
+    if name in BALLS:
+        player.balls_played.add(name)
+        for need, gen in COMBOS:
+            if need <= player.balls_played and gen not in player.combo_done:
+                player.combo_done.add(gen)
+                player.hand.append(gen)
+                log.append(f"元素共鸣：{gen} 加入手牌")
+
     player.cards_played += 1
 
 
 def enemy_act(player, enemy, log):
+    if enemy["hp"] <= 0:
+        return
+    if enemy.get("frozen"):
+        enemy["frozen"] = False
+        log.append(f"  {enemy['name']} 被冻结，跳过行动")
+        return
+    if enemy["burn"] > 0:
+        tick = enemy["burn"] * (4 if "烈焰" in player.powers else 1)
+        enemy["hp"] -= tick
+        log.append(f"  {enemy['name']} 灼烧发作，受到 {tick} 点伤害")
+        if enemy["hp"] <= 0:
+            return
     it = enemy["intents"][enemy["i"] % len(enemy["intents"])]
     enemy["i"] += 1
     apply_intent(player, enemy, it, log)
@@ -447,6 +700,9 @@ def apply_intent(player, enemy, it, log):
         dmg, times = it[1], it[2]
         for _ in range(times):
             d = dmg + enemy["strength"]
+            if enemy["weak"] > 0:
+                d //= 2
+                enemy["weak"] -= 1
             if enemy["rage"] > 0:
                 d += enemy["rage"]
                 enemy["rage"] = 0
@@ -524,6 +780,12 @@ def show_state(player, enemies, turn):
             extra.append(f"格挡{e['block']}")
         if e["bleed"]:
             extra.append(f"流血{e['bleed']}")
+        if e.get("burn"):
+            extra.append(f"灼烧{e['burn']}")
+        if e.get("weak"):
+            extra.append(f"虚弱{e['weak']}")
+        if e.get("frozen"):
+            extra.append("冻结")
         print(f"  [{idx}] {e['name']}  {max(0, e['hp'])}/{e['max_hp']} "
               f"意图：{intent_text(it)}" + (f"  ({', '.join(extra)})" if extra else ""))
     print(hr())
@@ -539,16 +801,18 @@ def show_state(player, enemies, turn):
 # ---------------------------------------------------------------- 主流程
 
 def battle(player, enemies, floor_name, policy=None):
+    _CTX["policy"] = policy
     player.new_battle()
     turn = 1
     log = []
     while enemies and player.hp > 0 and turn <= 100:
-        player.start_turn()
+        player.start_turn(enemies)
         if player.hp <= 0:
             break
         if player.stamina <= 0:
             print("\n体力见底，只能回店了。")
             return "retreat"
+        fails = 0
         while True:
             show_state(player, enemies, turn)
             if log:
@@ -578,14 +842,34 @@ def battle(player, enemies, floor_name, policy=None):
                 cost = 0
             if player.stamina < cost:
                 print("  ✗ 体力不够，只能结束回合了")
+                fails += 1
+                if fails >= len(player.hand) + 2:
+                    print("  （没有能出的牌，自动结束回合）")
+                    player.end_turn()
+                    slime_merge(enemies, log)
+                    break
                 continue
+            if name == "元素打击" and sum(1 for c in player.hand if c in BALLS) < 3:
+                print("  ✗ 手里不足 3 张球，元素打击打不出去")
+                fails += 1
+                if fails >= len(player.hand) + 2:
+                    print("  （没有能出的牌，自动结束回合）")
+                    player.end_turn()
+                    slime_merge(enemies, log)
+                    break
+                continue
+            fails = 0
             player.hand.pop(idx)
             player.stamina -= cost
             print(f"\n▶ 打出 {name}  (体力 -{cost})")
             play_card(player, name, enemies, log)
-            if CARDS[name]["kind"] == "能力":
+            card = CARDS[name]
+            if card["kind"] == "能力":
                 player.exhaust.append(name)
                 log.append("（能力牌已消耗，本局不再回到牌堆）")
+            elif card.get("exhaust") and "注能" not in player.powers:
+                player.exhaust.append(name)
+                log.append("（消耗）")
             else:
                 player.discard.append(name)
             for l in log:
@@ -622,7 +906,7 @@ def battle(player, enemies, floor_name, policy=None):
 
 
 def card_reward(player, policy=None):
-    pool = [c for c in REWARD_POOL]
+    pool = [c for c in REWARD_POOL if CARDS[c].get("owner", 1) == player.char]
     random.shuffle(pool)
     picks = pool[:3]
     print("\n" + hr("═"))
@@ -652,12 +936,16 @@ CARDS_HELP = """
   缓慢      获得格挡 -25%
   脆弱      受到伤害 +50%
   流血      下一次受到的伤害 +层数，然后清空
+  灼烧      敌人每回合行动前掉血，每层 1 点（有「烈焰」则每层 4 点），一直保留
+  冻结      该敌人这一回合不行动，触发一次后消失
+  元素共鸣  同一回合打出 火球+冰球 → 蓝火球；火球+风球 → 火龙卷；冰球+风球 → 冰暴
 """
 
 
 def main():
     global RUN_STAMINA
     seed = None
+    char = None
     if "--seed" in sys.argv:
         try:
             seed = int(sys.argv[sys.argv.index("--seed") + 1])
@@ -668,19 +956,36 @@ def main():
             RUN_STAMINA = int(sys.argv[sys.argv.index("--stamina") + 1])
         except (IndexError, ValueError):
             pass
+    if "--char" in sys.argv:
+        try:
+            char = int(sys.argv[sys.argv.index("--char") + 1])
+        except (IndexError, ValueError):
+            pass
     random.seed(seed)
 
     print(hr("═"))
     print("  《Selene's Black Tide Restaurant》")
     print("  肉鸽部分 · 文本试玩原型")
     print(hr("═"))
-    print(f"  角色 1「无脑灌伤」  生命 {START_HP}  每回合抽 {DRAW_PER_TURN}")
+    if char not in CHARS:
+        print("  选角色：")
+        for cid, info in CHARS.items():
+            print(f"    {cid}. {info['name']}  生命 {info['hp']}  每回合抽 {info['draw']}")
+            print(f"       能力：{info['ability']}")
+        while True:
+            s = input("  输入角色序号 >> ").strip()
+            if s.isdigit() and int(s) in CHARS:
+                char = int(s)
+                break
+            print("  ✗ 输角色序号")
+    info = CHARS[char]
+    print(f"  角色 {char}「{info['name']}」  生命 {info['hp']}  每回合抽 {info['draw']}")
     print(f"  整局体力 {RUN_STAMINA}，每张牌 {CARD_COST} 点")
     print("  没有回血，层数无上限：7 层一循环，看你能爬到第几层。")
     print(hr("═"))
     input("回车开始 >> ")
 
-    player = Player(STARTER_DECK)
+    player = Player(char)
     run_run(player)
 
 
