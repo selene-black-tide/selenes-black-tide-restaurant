@@ -6,9 +6,13 @@
     python game.py            正常开局
     python game.py --seed 42  固定随机种子
 
-原型参数（橙子定的两条）：
+原型参数（橙子定的）：
     · 整局体力 100 点，出牌消耗，见底回店
     · 所有卡牌耗 1 点体力
+    · 没有回血：打完不会自己回血，血就是一路往下掉
+    · 能力牌打出后消耗（进「消耗」堆，本局不再出现，但能力效果保留）
+    · 牌库按 抽牌堆 / 手牌 / 弃牌堆 / 消耗堆 四堆运作
+    · 层数无上限，敌怪分布以 7 层为一个循环
 
 数据来源：docs/00-overview/游戏企划书.md（角色 1 全套卡 + 地图 1 敌怪）
 未实现：史莱姆合体、遗物、事件房、卡牌升级（都不影响这一版的骨架验证）
@@ -31,8 +35,8 @@ RUN_STAMINA = 100        # 整局体力
 CARD_COST = 1            # 所有卡牌统一 1 点
 START_HP = 50            # 角色 1 初始生命
 DRAW_PER_TURN = 6        # 5 张基础 + 角色能力 1 张
-HEAL_AFTER_BATTLE = 5    # 原型平衡用：每场战斗后回 5 血，不是设定
 MAX_HAND = 10
+CYCLE = 7                # 7 层一个循环，层数本身无上限
 
 # ---------------------------------------------------------------- 卡库
 
@@ -93,38 +97,113 @@ REWARD_POOL = [c for c in CARDS if c not in ("打击", "防御", "重击")]
 
 # ---------------------------------------------------------------- 敌怪
 
-def E(name, hp, intents):
+def E(name, hp, intents, kind=None):
     return {"name": name, "hp": hp, "max_hp": hp, "block": 0, "strength": 0,
-            "rage": 0, "bleed": 0, "i": 0, "intents": intents}
+            "rage": 0, "bleed": 0, "i": 0, "intents": intents, "kind": kind}
 
 
 # 意图格式：("atk", 伤害, 次数) / ("str", n) / ("blk", n) / ("debuff", 名称)
-#          / ("drain", n) / ("rage", n)
+#          / ("drain", n) / ("rage", n) / ("entangle", n) / ("multi", [子意图...])
+# 数值全部来自橙子 2026-11-28 给的怪物表，未做任何调整。
 ENEMIES = {
-    "敌怪1": lambda: E("敌怪1", 30, [("atk", 7, 1), ("str", 3), ("atk", 10, 1)]),
-    "敌怪2": lambda: E("敌怪2", 35, [("debuff", "虚弱"), ("str", 10), ("atk", 13, 1)]),
-    "敌怪3": lambda: E("敌怪3", 24, [("atk", 5, 1), ("blk", 5), ("atk", 7, 1)]),
-    "敌怪5": lambda: E("敌怪5", 47, [("atk", 9, 1), ("blk", 6), ("str", 5), ("atk", 7, 2)]),
-    "敌怪6": lambda: E("敌怪6", 40, [("blk", 7), ("atk", 10, 1), ("rage", 3), ("atk", 6, 3)]),
-    "敌怪7": lambda: E("敌怪7", 38, [("atk", 1, 4), ("drain", 9), ("atk", 3, 4)]),
-    "精英1": lambda: E("精英1", 72, [("atk", 12, 1), ("str", 5), ("atk", 17, 1)]),
-    "大树精": lambda: E("大树精", 162, [("entangle", 4), ("atk", 14, 1), ("str", 2), ("atk", 16, 1)]),
-    # 三小只：企划书给的意图按三只分配，这里简化为固定循环
-    "三小只A": lambda: E("三小只·11", 11, [("atk", 4, 1), ("str", 5), ("atk", 4, 1)]),
-    "三小只B": lambda: E("三小只·16", 16, [("debuff", "缓慢"), ("atk", 11, 1)]),
-    "三小只C": lambda: E("三小只·6", 6, [("atk", 4, 1), ("debuff", "缓慢")]),
+    # —— 弱怪 ——
+    "敌怪1": lambda: E("敌怪1", 50, [("atk", 11, 1), ("str", 5), ("atk", 16, 1)]),
+    "敌怪2": lambda: E("敌怪2", 55, [("debuff", "虚弱"), ("str", 10), ("atk", 23, 1)]),
+    "敌怪3": lambda: E("敌怪3", 45, [("multi", [("atk", 10, 1), ("blk", 5)]), ("str", 5),
+                                     ("multi", [("atk", 15, 1), ("blk", 5)])]),
+    # —— 强怪 ——
+    "敌怪5": lambda: E("敌怪5", 63, [("atk", 19, 1), ("multi", [("blk", 6), ("str", 5)]),
+                                     ("atk", 10, 2)]),
+    "敌怪6": lambda: E("敌怪6", 60, [("multi", [("blk", 7), ("debuff", "脆弱"), ("debuff", "缓慢")]),
+                                     ("multi", [("atk", 18, 1), ("rage", 3)]), ("atk", 8, 3)]),
+    "敌怪7": lambda: E("敌怪7", 50, [("atk", 3, 4), ("multi", [("drain", 9), ("rage", 2)]),
+                                     ("atk", 5, 4)]),
+    # —— 精英 ——
+    "精英1": lambda: E("精英1", 92, [("atk", 18, 1), ("str", 5), ("atk", 23, 1)]),
+    # —— Boss ——
+    "大树精": lambda: E("大树精", 280, [("entangle", 6), ("atk", 21, 1), ("str", 5), ("atk", 26, 1)]),
+    # —— 三小只（20 / 35 / 15）——
+    "三小只A": lambda: E("三小只·20", 20, [("atk", 9, 1), ("str", 5), ("debuff", "缓慢")]),
+    "三小只B": lambda: E("三小只·35", 35, [("debuff", "缓慢"), ("atk", 16, 1), ("atk", 6, 1)]),
+    "三小只C": lambda: E("三小只·15", 15, [("atk", 9, 1), ("str", 5), ("debuff", "缓慢")]),
 }
 
-# 楼层遭遇（地图 1 的切片：弱怪 → 强怪 → 精英 → Boss）
+
+def small_slime(hp=20, name="史莱姆·小只"):
+    return E(name, hp, [("atk", 4, 1), ("multi", [("debuff", "虚弱"), ("str", 2)]),
+                        ("atk", 6, 1)], kind="小只")
+
+
+def medium_slime(hp=30):
+    return E("史莱姆·中只", hp, [("atk", 8, 1), ("multi", [("debuff", "虚弱"), ("str", 4)]),
+                                 ("atk", 12, 1)], kind="中只")
+
+
+# 7 层一个循环。第 5 层强怪、第 6 层精英随机，第 7 层大树精。
 FLOORS = [
     ("入口·苔径", "敌怪1"),
     ("积水走廊", "敌怪2"),
     ("碎石阶", "敌怪3"),
     ("湿洞", "三小只"),
-    ("巢穴外缘", "敌怪5"),
-    ("精英·锈铁门", "精英1"),
+    ("巢穴外缘", "强怪"),
+    ("精英·锈铁门", "精英"),
     ("树心", "大树精"),
 ]
+
+STRONG_POOL = ["敌怪5", "敌怪6", "敌怪7"]
+ELITE_POOL = ["精英1", "精英2"]
+
+
+def make_enemies(wave):
+    if wave == "三小只":
+        return [ENEMIES["三小只A"](), ENEMIES["三小只B"](), ENEMIES["三小只C"]()]
+    if wave == "强怪":
+        return [ENEMIES[random.choice(STRONG_POOL)]()]
+    if wave == "精英":
+        return make_enemies(random.choice(ELITE_POOL))
+    if wave == "精英2":
+        return [small_slime() for _ in range(4)]
+    return [ENEMIES[wave]()]
+
+
+def cleanup_enemies(enemies, log):
+    """清掉死掉的敌人；中只被击败会裂成两只 10 血小只。"""
+    out = []
+    for e in enemies:
+        if e["hp"] > 0:
+            out.append(e)
+        elif e.get("kind") == "中只":
+            out.extend([small_slime(10, "史莱姆·小只(裂)") for _ in range(2)])
+            log.append(f"  {e['name']} 被击碎，裂成两只 10 血小只")
+    enemies[:] = out
+
+
+def slime_merge(enemies, log):
+    """玩家回合结束时：血量 ≤6 的小只和相邻小只合体成 30 血中只；
+    还有残血小只的，继续融进中只，每只 +15 血。"""
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(enemies) - 1):
+            a, b = enemies[i], enemies[i + 1]
+            if (a.get("kind") == "小只" and b.get("kind") == "小只"
+                    and (a["hp"] <= 6 or b["hp"] <= 6)):
+                log.append(f"  {a['name']} 与 {b['name']} 合体 → 中只（30 血）")
+                enemies[i:i + 2] = [medium_slime()]
+                changed = True
+                break
+        if changed:
+            continue
+        for i, e in enumerate(enemies):
+            if e.get("kind") == "小只" and e["hp"] <= 6 and e["hp"] > 0:
+                med = next((x for x in enemies if x.get("kind") == "中只" and x["hp"] > 0), None)
+                if med:
+                    med["max_hp"] += 15
+                    med["hp"] += 15
+                    log.append(f"  {e['name']} 融进中只，中只 +15 血（{med['hp']}）")
+                    enemies.pop(i)
+                    changed = True
+                    break
 
 LOOT_TABLE = ["神秘肉类", "神秘调料", "高级升级素材", "增益道具"]
 
@@ -155,6 +234,8 @@ def intent_text(it):
         return f"怒气 +{it[1]}"
     if k == "entangle":
         return f"缠绕 +{it[1]}"
+    if k == "multi":
+        return " + ".join(intent_text(x) for x in it[1])
     return "?"
 
 
@@ -182,13 +263,13 @@ class Player:
         self.cards_played = 0
         self.dmg_counter = 0
         self.entangle = 0
-        self.draw_pile, self.hand, self.discard = [], [], []
+        self.draw_pile, self.hand, self.discard, self.exhaust = [], [], [], []
 
     # —— 牌堆 ——
     def new_battle(self):
         self.draw_pile = list(self.deck)
         random.shuffle(self.draw_pile)
-        self.hand, self.discard = [], []
+        self.hand, self.discard, self.exhaust = [], [], []
         self.block = 0
         self.entangle = 0
         self.thorns = False
@@ -353,7 +434,15 @@ def play_card(player, name, enemies, log):
 def enemy_act(player, enemy, log):
     it = enemy["intents"][enemy["i"] % len(enemy["intents"])]
     enemy["i"] += 1
+    apply_intent(player, enemy, it, log)
+
+
+def apply_intent(player, enemy, it, log):
     k = it[0]
+    if k == "multi":
+        for sub in it[1]:
+            apply_intent(player, enemy, sub, log)
+        return
     if k == "atk":
         dmg, times = it[1], it[2]
         for _ in range(times):
@@ -390,6 +479,10 @@ def enemy_act(player, enemy, log):
     elif k == "rage":
         enemy["rage"] += it[1]
         log.append(f"  {enemy['name']} 怒气 +{it[1]}")
+    elif k == "entangle":
+        player.entangle += it[1]
+        log.append(f"  {enemy['name']} 对你叠加缠绕，现在 {player.entangle} 层"
+                   f"（每回合掉 {player.entangle} 血）")
 
 
 # ---------------------------------------------------------------- 显示
@@ -401,6 +494,10 @@ def show_state(player, enemies, turn):
           f"[{bar(max(0, player.hp), player.max_hp)}]")
     print(f"体力 {player.stamina}/{RUN_STAMINA} [{bar(player.stamina, RUN_STAMINA)}]"
           f" · 格挡 {player.block}")
+    piles = f"抽牌堆 {len(player.draw_pile)} · 弃牌堆 {len(player.discard)}"
+    if player.exhaust:
+        piles += f" · 消耗 {len(player.exhaust)}"
+    print("  " + piles)
     st = []
     if player.strength:
         st.append(f"力量 {player.strength}")
@@ -449,6 +546,9 @@ def battle(player, enemies, floor_name, policy=None):
         player.start_turn()
         if player.hp <= 0:
             break
+        if player.stamina <= 0:
+            print("\n体力见底，只能回店了。")
+            return "retreat"
         while True:
             show_state(player, enemies, turn)
             if log:
@@ -466,6 +566,7 @@ def battle(player, enemies, floor_name, policy=None):
                 continue
             if cmd == "e":
                 player.end_turn()
+                slime_merge(enemies, log)      # 玩家回合结束：史莱姆合体
                 break
             if not cmd.isdigit() or not (1 <= int(cmd) <= len(player.hand)):
                 print("  ✗ 没有这张牌")
@@ -482,11 +583,15 @@ def battle(player, enemies, floor_name, policy=None):
             player.stamina -= cost
             print(f"\n▶ 打出 {name}  (体力 -{cost})")
             play_card(player, name, enemies, log)
-            player.discard.append(name)
+            if CARDS[name]["kind"] == "能力":
+                player.exhaust.append(name)
+                log.append("（能力牌已消耗，本局不再回到牌堆）")
+            else:
+                player.discard.append(name)
             for l in log:
                 print("  " + l)
             log = []
-            enemies[:] = [e for e in enemies if e["hp"] > 0]
+            cleanup_enemies(enemies, log)
             if not enemies:
                 break
             if player.hp <= 0:
@@ -506,10 +611,14 @@ def battle(player, enemies, floor_name, policy=None):
         enemies[:] = [e for e in enemies if e["hp"] > 0]
         turn += 1
 
-    win = player.hp > 0
-    if win:
-        print(f"\n✔ 清空「{floor_name}」")
-    return win
+    if player.hp <= 0:
+        return "dead"
+    if enemies:
+        return "retreat"          # 打满 100 回合还没结束，按撤退处理
+    if player.stamina <= 0:
+        return "retreat"
+    print(f"\n✔ 清空「{floor_name}」")
+    return "win"
 
 
 def card_reward(player, policy=None):
@@ -567,7 +676,7 @@ def main():
     print(hr("═"))
     print(f"  角色 1「无脑灌伤」  生命 {START_HP}  每回合抽 {DRAW_PER_TURN}")
     print(f"  整局体力 {RUN_STAMINA}，每张牌 {CARD_COST} 点")
-    print("  体力见底就回不了店了，省着点打。")
+    print("  没有回血，层数无上限：7 层一循环，看你能爬到第几层。")
     print(hr("═"))
     input("回车开始 >> ")
 
@@ -575,45 +684,57 @@ def main():
     run_run(player)
 
 
-def run_run(player, policy=None):
-    """跑一整局。policy(player, enemies) -> 命令字符串；None 表示由玩家输入。"""
+def floor_label(i):
+    """第 i 层（0 起）显示名。层数无限，7 层一循环。"""
+    name = FLOORS[i % CYCLE][0]
+    cycle = i // CYCLE + 1
+    return name if cycle == 1 else f"{name}（第 {cycle} 圈）"
+
+
+def run_run(player, policy=None, max_floors=None):
+    """跑一整局。层数无上限，7 层一循环。
+    policy(player, enemies) -> 命令字符串；None 表示由玩家输入。"""
     loot = []
     cleared = 0
-    for floor_name, wave in FLOORS:
+    cause = "回店"
+    i = 0
+    while max_floors is None or cleared < max_floors:
+        floor_name, wave = FLOORS[i % CYCLE]
+        label = floor_label(i)
         print("\n" + hr("═"))
-        print(f"  ▶ {floor_name}   体力 {player.stamina}/{RUN_STAMINA}")
+        print(f"  ▶ 第 {cleared + 1} 层 · {label}   体力 {player.stamina}/{RUN_STAMINA}")
         print(hr("═"))
         if wave == "三小只":
-            enemies = [ENEMIES["三小只A"](), ENEMIES["三小只B"](), ENEMIES["三小只C"]()]
+            enemies = make_enemies("三小只")
         else:
-            enemies = [ENEMIES[wave]()]
-        ok = battle(player, enemies, floor_name, policy)
-        if not ok:
+            enemies = make_enemies(wave)
+        res = battle(player, enemies, label, policy)
+        if res == "dead":
             print("\n" + hr("═"))
-            print("  ✘ 倒在了地牢里。")
-            print("  带回的东西全丢了（原型规则：失败 = 全丢）。")
+            print(f"  ✘ 倒在第 {cleared + 1} 层「{label}」。")
+            print("  没带回任何东西（原型规则：倒了 = 全丢）。")
             print(hr("═"))
-            return {"win": False, "cleared": cleared, "loot": [], "stamina": player.stamina}
+            return {"win": False, "cleared": cleared, "loot": [],
+                    "stamina": player.stamina, "cause": "生命归零"}
+        if res == "retreat":
+            cause = "体力见底"
+            break
         cleared += 1
-        if floor_name.startswith("精英") or floor_name == "树心":
+        if wave in ("精英", "大树精"):
             loot.append(random.choice(LOOT_TABLE))
         loot.append(random.choice(LOOT_TABLE))
-        player.hp = min(player.max_hp, player.hp + HEAL_AFTER_BATTLE)
-        if wave != "大树精":
-            card_reward(player, policy)
-        if player.stamina <= 0:
-            print("\n体力耗尽，只能回店了。")
-            break
+        card_reward(player, policy)
+        i += 1
 
     print("\n" + hr("═"))
-    print("  ✔ 回店结算")
+    print(f"  ✔ 回店结算（{cause}）")
+    print(f"  推进到第 {cleared} 层    卡组 {len(player.deck)} 张")
     print(f"  剩余体力 {player.stamina}/{RUN_STAMINA}    生命 {max(0, player.hp)}/{player.max_hp}")
     print(f"  战利品：{'、'.join(loot) if loot else '空手而归'}")
-    print(f"  卡组 {len(player.deck)} 张 · 推进 {cleared}/{len(FLOORS)} 层")
     print(hr("═"))
     print("  这些东西第二天营业能用（经营部分未实现）")
-    return {"win": cleared == len(FLOORS), "cleared": cleared,
-            "loot": loot, "stamina": player.stamina}
+    return {"win": False, "cleared": cleared, "loot": loot,
+            "stamina": player.stamina, "cause": cause}
 
 
 if __name__ == "__main__":
