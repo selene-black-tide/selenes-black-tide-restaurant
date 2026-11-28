@@ -1,161 +1,104 @@
 # -*- coding: utf-8 -*-
 """
-经营部分数值模拟（只读企划书，不改任何设定）
+经营部分数值模拟 v2：按 docs/10-design/W1数值清单.md 与 系统-经营供给.md（2026-11-29 版）
 
-用法：  python 经营模拟.py            打印全部结果（Markdown 表格）
-        python 经营模拟.py --seeds 500
-
-数据来源（全部是组长 11-28 的「演示参数」，不是平衡值）：
-  产能   做菜总时长 = Σ(加成 × 工时) × 60     W1=960 / W2=1680 / W3=2544 min
-  菜谱   菜A 30min 100￥ (肉A1+蔬菜A1)；菜B 50min 300￥ (肉B1+蔬菜B1+调味A1)
-  库存   肉A/蔬菜A/肉B/蔬菜B 上限 20，调味A 上限 10（计划单示例里的 x/20、x/10）
-  需求   来客数 × (2~3)，来客数上限 = 座位数 = 30
-  风评   Δ = 1.0×(s−0.9)；特殊菜 +0.15 / 个，每天最多 2 个；暴毙 5% × −0.3（午夜班掷一次）
-  特殊单 5 份菜B → +1000￥
-  工资   厨师长 2000￥/周
-  升级   桌子 10000￥；二楼 100000￥
-
-文档里【没有】的东西，下面标「假设」，只为了让模拟能转起来，不是设定：
-  · 风评初始值、风评→来客数的换算
-  · 肉鸽每周给多少食材
-  · 特殊单一天出几个
+数据（均为组长的演示参数 / 提案）：
+  风评 30 起；来客 = 座位 × 风评 ÷ 100；每人点 2~3 道；k = 1.5、s0 = 0.9
+  座位 30；桌子升级 10000￥（→ 40 座，按 4 座/桌）；二楼 100000￥（+10 桌，按 4 座/桌，我的假设）
+  厨房 W1：960min；成品菜 A 30min 100￥，配方 肉 1 + 蔬菜 A 1
+  菜园：开局蔬菜 A150 / B100 / C50，A 一周一熟（每周补种 150，清单口径）
+  地窖：肉 500 / 菜 500；厨师长 2000￥/周；初始资金 3000￥
+  肉：肉鸽周初一局，肉量取自『肉鸽模拟.py』按节点累计（弱怪 15 / 三小只 20 / 强怪 25 / 精英 35 / Boss 55）
+我自己加的假设（文档没写，已在报告里标注）：
+  · 所有肉都是怪物肉，午夜班每天掷一次暴毙 5% × −0.3
+  · 玩家按『预计需求』备菜，不会故意多做
+  · 灶台 / 其他雇员价格没有，W2 厨房用参数 kitchen_up_week 控制
+用法：python 经营模拟.py --seeds 200
 """
-import itertools
+import json
+import os
 import random
 import statistics
 import sys
 
-# ------------------------------------------------------------ 文档给定
-
-DISHES = {
-    "A": dict(t=30, price=100, need={"肉A": 1, "蔬菜A": 1}),
-    "B": dict(t=50, price=300, need={"肉B": 1, "蔬菜B": 1, "调味A": 1}),
-}
-CAP = {"肉A": 20, "蔬菜A": 20, "肉B": 20, "蔬菜B": 20, "调味A": 10}   # 计划单示例的 x/20、x/10
-KITCHEN = {"W1": 960, "W2": 1680, "W3": 2544}                          # min/天
-SEATS = 30
-ORDER_PER_GUEST = (2, 3)
-K, S0 = 1.0, 0.9
-SPECIAL_REP, SPECIAL_CASH, SPECIAL_B = 0.15, 1000, 5
-DEATH_P, DEATH_REP = 0.05, -0.3
-CHEF_WAGE_WEEK = 2000
+HERE = os.path.dirname(os.path.abspath(__file__))
+K, S0 = 1.5, 0.9
+PRICE, T_DISH = 100, 30
+WAGE = 2000
 
 
-# ------------------------------------------------------------ 工具
-
-def best_plan(minutes, stock, demand):
-    """在时间 / 库存 / 需求三个上限内，枚举 (a,b) 找收入最高的做法。"""
-    best = (0, 0, 0)
-    bmax = min(stock["肉B"], stock["蔬菜B"], stock["调味A"], minutes // DISHES["B"]["t"])
-    for b in range(int(bmax) + 1):
-        left = minutes - b * DISHES["B"]["t"]
-        amax = min(stock["肉A"], stock["蔬菜A"], left // DISHES["A"]["t"])
-        for a in (int(amax),):          # A 单价/分钟低于 B，剩余时间全给 A 即可
-            served_b = min(b, demand)
-            served_a = min(a, max(0, demand - served_b))
-            rev = served_b * 300 + served_a * 100
-            if rev > best[0]:
-                best = (rev, a, b)
-    return best
+def load(name):
+    p = os.path.join(HERE, name)
+    return json.load(open(p)) if os.path.exists(p) else {}
 
 
-def full_stock():
-    return dict(CAP)
-
-
-# ------------------------------------------------------------ 一、静态天花板
-
-def static_table():
-    rows = []
-    for name, mins in KITCHEN.items():
-        rev, a, b = best_plan(mins, full_stock(), 10**9)
-        used = a * 30 + b * 50
-        rows.append((name, mins, a, b, a + b, rev, used, mins - used))
-    return rows
-
-
-def time_only_table():
-    """如果食材不设限，纯看时间，W1~W3 能做多少份（全做 A / 全做 B）。"""
-    return [(n, m, m // 30, m // 50) for n, m in KITCHEN.items()]
-
-
-# ------------------------------------------------------------ 二、日循环（含风评）
-
-def guests_from_rep(rep, mapping, seats=SEATS):
-    """假设：风评→来客数。文档只说「风评越大来客越多」，没给公式。"""
-    r = max(0.0, min(100.0, rep)) / 100
-    if mapping == "线性":                 # 来客 = 座位 × 风评/100
-        return seats * r
-    if mapping == "半线性":               # 来客 = 座位 × (0.5 + 0.5×风评/100)
-        return seats * (0.5 + 0.5 * r)
-    raise ValueError(mapping)
-
-
-def run(kitchen, rep0, mapping, weeks, daily_refill, weekly_supply, p_special,
-        wage_extra_week, rng, special_enabled=True, seats=SEATS):
-    """
-    kitchen         W1/W2/W3
-    daily_refill    True：库存每天回满（库存上限 = 每天可用量）
-                    False：库存是仓库，每周由肉鸽补 weekly_supply 个/种，封顶到 CAP
-    weekly_supply   仓库模式下每周每种食材补多少（假设）
-    p_special       每天出特殊单的个数（0/1/2，假设）
-    """
-    rep = rep0
-    stock = full_stock() if daily_refill else {k: 0 for k in CAP}
-    out = dict(rev=[], rep=[], s=[], waste=[])
-    mins = KITCHEN[kitchen]
+def run(weeks, rng, meat_src, rep0=30, seats0=30, veg_weekly=150, cash0=3000, kitchen_up_week=None,
+        extra_wage=3000, fixed_ratio=None, buy=True, meat_cap=500, veg_cap=500):
+    """meat_src: 数字（每周固定）或列表（每周抽一个）"""
+    rep, seats, cash = rep0, seats0, cash0
+    meat, vega = 0, 150
+    kit = 960
+    tables_bought = floor_bought = None
+    out = []
     for w in range(weeks):
-        if not daily_refill:
-            for k in stock:
-                stock[k] = min(CAP[k], stock[k] + weekly_supply)
-        wrev = 0.0
+        if kitchen_up_week is not None and w == kitchen_up_week:
+            kit = 1680
+        extra = extra_wage if kit > 960 else 0
+        drop = meat_src if isinstance(meat_src, (int, float)) else (rng.choice(meat_src) if meat_src else 0)
+        meat = min(meat_cap, meat + drop)
+        if w > 0:
+            vega = min(veg_cap, vega + veg_weekly)
+        rev = short_days = 0
+        dem_total = made_total = 0
         for d in range(7):
-            if daily_refill:
-                stock = full_stock()
-            guests = guests_from_rep(rep, mapping, seats)
-            guests = max(0.0, guests)
-            demand = int(round(guests * rng.uniform(*ORDER_PER_GUEST)))
-            # 特殊单：需要 5 份 B，先留出来
-            n_sp = 0
-            if special_enabled and p_special:
-                for _ in range(p_special):
-                    if stock["肉B"] >= SPECIAL_B and stock["蔬菜B"] >= SPECIAL_B and stock["调味A"] >= SPECIAL_B \
-                       and mins >= SPECIAL_B * 50:
-                        n_sp += 1
-                        stock["肉B"] -= SPECIAL_B; stock["蔬菜B"] -= SPECIAL_B; stock["调味A"] -= SPECIAL_B
-            sp_time = n_sp * SPECIAL_B * 50
-            sp_dishes = n_sp * SPECIAL_B
-            rev, a, b = best_plan(mins - sp_time, stock, max(0, demand - sp_dishes))
-            for k, v in (("肉A", a), ("蔬菜A", a), ("肉B", b), ("蔬菜B", b), ("调味A", b)):
-                stock[k] -= v
-            made = a + b + sp_dishes
-            served = min(made, demand)
-            s = 1.0 if demand == 0 else min(served / demand, 1.0)
-            rev += n_sp * (SPECIAL_B * 300 + SPECIAL_CASH)
-            drev = rev
-            d_rep = K * (s - S0) + n_sp * SPECIAL_REP
-            # 暴毙：菜单含怪物肉类菜品。文档没说哪道菜是怪物肉，这里假设：只要卖出 B 就算
-            if (b + sp_dishes) > 0 and served > 0 and rng.random() < DEATH_P:
-                d_rep += DEATH_REP
+            guests = seats * rep / 100
+            ratio = fixed_ratio if fixed_ratio else rng.uniform(2, 3)
+            dem = int(guests * ratio)
+            exp = int(guests * 2.5)
+            cap_t = kit // T_DISH
+            make = min(exp, cap_t, meat, vega)
+            if make < exp and make < cap_t:
+                short_days += 1
+            meat -= make
+            vega -= make
+            served = min(make, dem)
+            s = 1.0 if dem == 0 else served / dem
+            rev += served * PRICE
+            d_rep = K * (s - S0)
+            if make > 0 and rng.random() < 0.05:
+                d_rep -= 0.3
             rep = max(0.0, min(100.0, rep + d_rep))
-            wrev += drev
-            out["s"].append(s)
-            out["waste"].append(max(0, made - demand))
-        out["rev"].append(wrev - CHEF_WAGE_WEEK - wage_extra_week)
-        out["rep"].append(rep)
-    return out
+            dem_total += dem
+            made_total += make
+        cash += rev - WAGE - extra
+        if buy:
+            if seats == seats0 and cash >= 10000 + WAGE:
+                cash -= 10000
+                seats = 40
+                tables_bought = w + 1
+            elif seats == 40 and cash >= 100000 + WAGE:
+                cash -= 100000
+                seats = 80
+                floor_bought = w + 1
+        out.append(dict(rep=rep, seats=seats, rev=rev - WAGE - extra, cash=cash, dem=dem_total / 7,
+                        made=made_total / 7, short=short_days, drop=drop, meat=meat))
+    return out, tables_bought, floor_bought
 
 
 def mc(seeds, **kw):
-    res = [run(rng=random.Random(i), **kw) for i in range(seeds)]
-    weeks = len(res[0]["rev"])
-    rev = [statistics.mean(r["rev"][w] for r in res) for w in range(weeks)]
-    rep = [statistics.mean(r["rep"][w] for r in res) for w in range(weeks)]
-    s = statistics.mean(statistics.mean(r["s"]) for r in res)
-    return rev, rep, s
+    rs, tb, fb = [], [], []
+    for i in range(seeds):
+        o, t, f = run(rng=random.Random(i), **kw)
+        rs.append(o)
+        tb.append(t)
+        fb.append(f)
+    weeks = len(rs[0])
+    agg = {k: [statistics.mean(r[w][k] for r in rs) for w in range(weeks)] for k in rs[0][0]}
+    def med(x):
+        v = [a for a in x if a]
+        return (f"第{statistics.median(v):.0f}周" if len(v) > len(x) / 2 else "未到") if v else "未到"
+    return agg, med(tb), med(fb)
 
-
-# ------------------------------------------------------------ 打印
 
 def md(rows, head):
     print("| " + " | ".join(head) + " |")
@@ -169,90 +112,75 @@ def main():
     seeds = 200
     if "--seeds" in sys.argv:
         seeds = int(sys.argv[sys.argv.index("--seeds") + 1])
+    dist = load("肉鸽掉落分布.json")
+    tuned = load("肉鸽掉落分布-调参.json")
 
-    print("## 1. 当天产能天花板（食材按文档上限 20/20/20/20/10，满库存）\n")
-    md(static_table(), ["阶段", "产能min", "做A", "做B", "总份数", "最高日收入￥", "用掉min", "闲置min"])
-    print("需求侧：来客 30 座 × (2~3) = 60~90 份/天；计划单示例写 50~100。\n")
+    print("## 1. 清单口径复算：W1 第一周逐日（来客 9、需求 22、肉 170、蔬菜 A 150）\n")
+    meat, vega, rep, rows, rev = 170, 150, 30.0, [], 0
+    for d in range(1, 8):
+        dem = int(30 * rep / 100 * 2.5)
+        make = min(dem, 960 // 30, meat, vega)
+        meat -= make
+        vega -= make
+        s = make / dem
+        rep += K * (s - S0)
+        rev += make * PRICE
+        rows.append((d, dem, make, f"{s:.2f}", f"{K*(s-S0):+.2f}", f"{rep:.2f}", meat, vega))
+    md(rows, ["天", "需求", "做", "满足率", "Δ风评", "风评", "剩肉", "剩蔬菜A"])
+    print(f"一周收入 {rev}￥、周净利 {rev-WAGE}￥（清单写 15400 / 13400）。\n"
+          "清单口径把 300 蔬菜（A150/B100/C50）当成通用菜；成品菜 A 只吃蔬菜 A，开局只有 150。\n")
 
-    print("## 2. 食材不设限时，纯看时间能做多少份\n")
-    md(time_only_table(), ["阶段", "产能min", "全做A份数", "全做B份数"])
-    print("对照需求 60~90：W1 约 32 份(A) → 满足率 ≈0.43；W2 56 份 → ≈0.75；W3 84 份 → ≈1。\n")
-
-    print("## 3. 满足率与风评日变化（需求取中值 75 份）\n")
+    print("## 2. 肉需求：随座位与风评一周要多少肉\n")
     rows = []
-    for name, mins in KITCHEN.items():
-        for label, stock in (("食材上限20/20/20/20/10", full_stock()), ("食材无限", {k: 10**6 for k in CAP})):
-            rev, a, b = best_plan(mins, stock, 75)
-            served = a + b
-            s = min(served / 75, 1)
-            rows.append((name, label, a, b, served, f"{s:.2f}", f"{K*(s-S0):+.3f}", rev))
-    md(rows, ["阶段", "食材", "A", "B", "份数", "满足率s", "Δ风评/天", "日收入￥"])
+    for seats in (30, 40, 80):
+        row = [seats]
+        for rep in (30, 40, 50, 70, 100):
+            d = int(seats * rep / 100 * 2.5)
+            row.append(f"{d}/天 · {d*7}/周" + ("（超产能）" if d > 32 else ""))
+        rows.append(row)
+    md(rows, ["座位", "风评30", "风评40", "风评50", "风评70", "风评100"])
+    print("W1 厨房一天最多做 32 份（960÷30）。\n")
 
-    print("## 4. 一周总账：食材上限 20 当作『仓库上限』（肉鸽一周补一次，补满）\n")
+    print("## 3. 肉鸽带回的肉 vs 需求：20 周模拟（座位按钱升级，W1 厨房，蔬菜 A 每周补 150）\n")
+    scen = [("肉鸽每周固定 170（清单口径）", 170)]
+    if dist.get("稳"):
+        scen.append(("机器人『稳』的真实分布（当前 game.py，倒了全丢）", dist["稳"]))
+    if tuned.get("稳"):
+        scen.append(("机器人『稳』，怪物生命 ×0.7", tuned["稳"]))
+    scen.append(("肉鸽周周空手（对照）", 0))
     rows = []
-    for name, mins in KITCHEN.items():
-        # 一周内仓库只有 20/20/20/20/10，一周最多做完这些
-        rev_wk, a, b = best_plan(10**6, full_stock(), 10**9)
-        rows.append((name, a, b, a + b, rev_wk, CHEF_WAGE_WEEK, f"{CHEF_WAGE_WEEK/rev_wk:.0%}", f"{(a+b)/(7*75):.1%}"))
-    md(rows, ["阶段", "A", "B", "一周总份数", "一周最高收入￥", "厨师长周薪", "薪水占收入", "占周需求(约525份)"])
-    print("（W1~W3 在这个口径下结果相同——产能根本用不上，一周就是 30 份。）\n")
+    for name, src in scen:
+        a, tb, fb = mc(seeds, weeks=20, meat_src=src)
+        for w in (0, 3, 7, 11, 19):
+            rows.append((name if w == 0 else "", f"第{w+1}周", f"{a['rep'][w]:.1f}", f"{a['seats'][w]:.0f}",
+                         f"{a['dem'][w]:.1f}", f"{a['made'][w]:.1f}", f"{a['short'][w]:.1f}",
+                         f"{a['rev'][w]:.0f}", f"{a['cash'][w]:.0f}"))
+        rows.append(("", f"桌子 {tb}；二楼 {fb}", "", "", "", "", "", "", ""))
+    md(rows, ["肉鸽供给", "周", "风评", "座位", "日需求", "日出品", "断粮天数/周", "周净收入", "现金"])
 
-    print("## 5. 要把产能吃满，一周需要多少食材（每种）\n")
+    print("## 4. 蔬菜 A 是否够：菜园每周补多少（肉固定 170）\n")
     rows = []
-    for name, mins in KITCHEN.items():
-        wk = mins * 7
-        rows.append((name, wk, wk // 30, wk // 50))
-    md(rows, ["阶段", "一周总分钟", "全做A要几套(肉+菜)", "全做B要几套(肉+菜+调味)"])
-    print("对比库存上限 20（调味 10）。\n")
+    for vw in (0, 150, 250, 300):
+        a, tb, fb = mc(seeds // 2, weeks=12, meat_src=170, veg_weekly=vw)
+        rows.append((vw, f"{a['short'][0]:.1f}", f"{a['short'][3]:.1f}", f"{a['short'][11]:.1f}", f"{a['rev'][11]:.0f}"))
+    md(rows, ["菜园每周补蔬菜A", "第1周断粮天", "第4周", "第12周", "第12周周净收入"])
 
-    print("## 6. 风评涨速与特殊单（解析）\n")
-    rows = [
-        ("满座全喂饱", "+0.100", "—"),
-        ("特殊单 1 个/天", "+0.150", "1.5×"),
-        ("特殊单 2 个/天（上限）", "+0.300", "3×"),
-        ("满座喂饱 + 2 个特殊单", "+0.400", "4×"),
-        ("暴毙期望（有 B 菜时）", "−0.015", "−0.15×"),
-        ("s=0.53 一天", "−0.370", "−3.7×"),
-    ]
-    md(rows, ["情景", "Δ风评/天", "相对『满座喂饱』"])
-    for label, per_day in (("只靠满足率", 0.1), ("满足率 + 每天 1 个特殊单", 0.25), ("满足率 + 每天 2 个特殊单", 0.4)):
-        print(f"- {label}：每天 +{per_day} → 40 周 {per_day*280:.0f} 分，60 周 {per_day*420:.0f} 分，满分 100 要 {100/per_day/7:.0f} 周")
-    print()
-
-    print("## 7. 蒙特卡洛（%d 次，52 周）：风评→来客是『假设』\n" % seeds)
-    print("来客 = 座位 × 风评/100（线性假设）；食材每天回满（最乐观口径）。\n")
+    print("## 5. 风评节奏：什么时候撞上 W1 厨房上限（32 份/天）\n")
     rows = []
-    for rep0 in (20, 50, 80):
-        for name in ("W1", "W2", "W3"):
-            for sp in (0, 2):
-                rev, rep, s = mc(seeds, kitchen=name, rep0=rep0, mapping="线性", weeks=52, daily_refill=True,
-                                 weekly_supply=0, p_special=sp, wage_extra_week=0)
-                rows.append((rep0, name, sp, f"{rep[7]:.1f}", f"{rep[25]:.1f}", f"{rep[51]:.1f}",
-                             f"{statistics.mean(rev[:8]):.0f}", f"{statistics.mean(rev[-8:]):.0f}", f"{s:.2f}"))
-    md(rows, ["初始风评", "阶段", "特殊单/天", "第8周风评", "第26周", "第52周", "前8周均周净收入", "末8周均周净收入", "平均s"])
+    for seats in (30, 40):
+        a, tb, fb = mc(seeds // 2, weeks=52, meat_src=400, veg_weekly=300, buy=False, seats0=seats, meat_cap=1000, veg_cap=1000)
+        hit = next((w + 1 for w in range(52) if a["dem"][w] >= 32), None)
+        rows.append((seats, f"{a['rep'][12]:.1f}", f"{a['rep'][25]:.1f}", f"{a['rep'][51]:.1f}",
+                     f"{hit}" if hit else "52 周内没有", f"{a['made'][51]:.1f}"))
+    md(rows, ["座位", "第13周风评", "第26周", "第52周", "需求触到32份的周", "第52周日出品"])
 
-    print("## 8. 食材走仓库口径（每周补 N 套，封顶上限）：52 周周净收入\n")
+    print("## 6. W2 厨房（1680min）什么时候值（肉固定 400/周、蔬菜 A 每周 300；额外工资 3000/周 为假设）\n")
     rows = []
-    for supply in (5, 10, 20, 40):
-        for name in ("W1", "W3"):
-            rev, rep, s = mc(seeds, kitchen=name, rep0=50, mapping="线性", weeks=52, daily_refill=False,
-                             weekly_supply=supply, p_special=0, wage_extra_week=0)
-            rows.append((supply, name, f"{statistics.mean(rev):.0f}", f"{rep[-1]:.1f}", f"{s:.2f}"))
-    md(rows, ["每周补(每种)", "阶段", "周净收入均值￥", "第52周风评", "平均s"])
-
-    print("## 9. 座位升级到底赚不赚（食材每天回满、W3、特殊单 0；座位只在『需求<供给』时才有用）\n")
-    rows = []
-    for rep0 in (20, 50):
-        base = None
-        for seats, label, cost in ((30, "30座(初始)", 0), (40, "40座(桌子升级 10000￥)", 10000), (80, "80座(二楼 100000￥，假设新增 10 桌×4 座)", 110000)):
-            rev, rep, s = mc(seeds, kitchen="W3", rep0=rep0, mapping="线性", weeks=52, daily_refill=True,
-                             weekly_supply=0, p_special=0, wage_extra_week=0, seats=seats)
-            tot = sum(rev)
-            if base is None:
-                base = tot
-            gain = tot - base
-            rows.append((rep0, label, f"{tot:.0f}", f"{gain:+.0f}", f"{cost}", "—" if gain <= 0 or cost == 0 else f"{cost / (gain / 52):.0f} 周"))
-    md(rows, ["初始风评", "座位", "52 周净收入合计￥", "比 30 座多赚￥", "累计花费￥", "回本"])
+    for up in (None, 4, 8):
+        a, tb, fb = mc(seeds // 2, weeks=20, meat_src=400, veg_weekly=300, kitchen_up_week=up, meat_cap=800, veg_cap=800)
+        rows.append(("不升级" if up is None else f"第{up+1}周升级", f"{statistics.mean(a['rev'][12:20]):.0f}",
+                     f"{a['rep'][19]:.1f}", f"{a['made'][19]:.1f}", f"{a['dem'][19]:.1f}"))
+    md(rows, ["厨房", "第13~20周均周净收入", "第20周风评", "第20周日出品", "日需求"])
 
 
 if __name__ == "__main__":
