@@ -96,13 +96,13 @@ CARDS = {
     "歌咏": {"kind": "技能", "owner": 2, "text": "弃牌堆的一张回手",
              "ops": [("pick_discard", 1)]},
 
-    # —— 球 ——
+    # —— 球 ——（火/冰/风在初始卡组里，不进战斗奖励池）
     "火球": {"kind": "攻击", "owner": 2, "text": "打 10，灼烧 1", "ball": True, "atk": 10,
-             "ops": [("dmg", 10), ("burn", 1)]},
+             "no_reward": True, "ops": [("dmg", 10), ("burn", 1)]},
     "冰球": {"kind": "攻击", "owner": 2, "text": "打 4 防 4", "ball": True, "atk": 4,
-             "ops": [("dmg", 4), ("block", 4)]},
+             "no_reward": True, "ops": [("dmg", 4), ("block", 4)]},
     "风球": {"kind": "攻击", "owner": 2, "text": "打 6，虚弱 1", "ball": True, "atk": 6,
-             "ops": [("dmg", 6), ("weak_enemy", 1)]},
+             "no_reward": True, "ops": [("dmg", 6), ("weak_enemy", 1)]},
     "土球": {"kind": "攻击", "owner": 2, "text": "打 10，弃牌堆加一张复制", "ball": True, "atk": 10,
              "ops": [("dmg", 10), ("copy_self",)]},
 
@@ -152,7 +152,7 @@ CHARS = {
         "deck": ["打击"] * 4 + ["防御"] * 4 + ["重击"],
         "ability": "每回合多抽一张牌"},
     2: {"name": "检索展开", "hp": 40, "draw": 5,
-        "deck": ["打击"] * 3 + ["防御"] * 3 + ["歌咏"],
+        "deck": ["打击"] * 3 + ["防御"] * 3 + ["歌咏", "火球", "冰球", "风球"],
         "ability": "回合结束可以保留一张手牌"},
 }
 
@@ -167,7 +167,8 @@ COMBOS = [
 DECOMPOSE = {"蓝火球": ("冰球", "火球"), "火龙卷": ("火球", "风球"), "冰暴": ("冰球", "风球")}
 
 STARTER_DECK = CHARS[1]["deck"]
-REWARD_POOL = [c for c in CARDS if c not in ("打击", "防御", "重击")]
+REWARD_POOL = [c for c in CARDS if c not in ("打击", "防御", "重击")
+               and not CARDS[c].get("no_reward")]
 
 # ---------------------------------------------------------------- 敌怪
 
@@ -679,12 +680,6 @@ def enemy_act(player, enemy, log):
         enemy["frozen"] = False
         log.append(f"  {enemy['name']} 被冻结，跳过行动")
         return
-    if enemy["burn"] > 0:
-        tick = enemy["burn"] * (4 if "烈焰" in player.powers else 1)
-        enemy["hp"] -= tick
-        log.append(f"  {enemy['name']} 灼烧发作，受到 {tick} 点伤害")
-        if enemy["hp"] <= 0:
-            return
     it = enemy["intents"][enemy["i"] % len(enemy["intents"])]
     enemy["i"] += 1
     apply_intent(player, enemy, it, log)
@@ -800,6 +795,23 @@ def show_state(player, enemies, turn):
 
 # ---------------------------------------------------------------- 主流程
 
+def burn_tick(player, enemies, log):
+    """玩家回合结束时结算灼烧：每层掉 1 血（有「烈焰」每层 4 血），层数不衰减。"""
+    for e in enemies:
+        if e["hp"] <= 0 or e.get("burn", 0) <= 0:
+            continue
+        tick = e["burn"] * (4 if "烈焰" in player.powers else 1)
+        e["hp"] -= tick
+        log.append(f"  {e['name']} 灼烧发作 {e['burn']} 层，受到 {tick} 点伤害")
+
+
+def end_player_turn(player, enemies, log):
+    player.end_turn()
+    burn_tick(player, enemies, log)     # 回合结束：灼烧先结算
+    slime_merge(enemies, log)           # 再判史莱姆合体
+    cleanup_enemies(enemies, log)
+
+
 def battle(player, enemies, floor_name, policy=None):
     _CTX["policy"] = policy
     player.new_battle()
@@ -829,8 +841,7 @@ def battle(player, enemies, floor_name, policy=None):
                 print(CARDS_HELP)
                 continue
             if cmd == "e":
-                player.end_turn()
-                slime_merge(enemies, log)      # 玩家回合结束：史莱姆合体
+                end_player_turn(player, enemies, log)
                 break
             if not cmd.isdigit() or not (1 <= int(cmd) <= len(player.hand)):
                 print("  ✗ 没有这张牌")
@@ -845,8 +856,7 @@ def battle(player, enemies, floor_name, policy=None):
                 fails += 1
                 if fails >= len(player.hand) + 2:
                     print("  （没有能出的牌，自动结束回合）")
-                    player.end_turn()
-                    slime_merge(enemies, log)
+                    end_player_turn(player, enemies, log)
                     break
                 continue
             if name == "元素打击" and sum(1 for c in player.hand if c in BALLS) < 3:
@@ -854,8 +864,7 @@ def battle(player, enemies, floor_name, policy=None):
                 fails += 1
                 if fails >= len(player.hand) + 2:
                     print("  （没有能出的牌，自动结束回合）")
-                    player.end_turn()
-                    slime_merge(enemies, log)
+                    end_player_turn(player, enemies, log)
                     break
                 continue
             fails = 0
@@ -936,7 +945,7 @@ CARDS_HELP = """
   缓慢      获得格挡 -25%
   脆弱      受到伤害 +50%
   流血      下一次受到的伤害 +层数，然后清空
-  灼烧      敌人每回合行动前掉血，每层 1 点（有「烈焰」则每层 4 点），一直保留
+  灼烧      你的回合结束时发作，每层掉 1 血（有「烈焰」则每层 4 血），层数一直保留
   冻结      该敌人这一回合不行动，触发一次后消失
   元素共鸣  同一回合打出 火球+冰球 → 蓝火球；火球+风球 → 火龙卷；冰球+风球 → 冰暴
 """
